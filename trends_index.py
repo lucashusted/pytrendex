@@ -15,7 +15,7 @@ import time
 from pytrends.request import TrendReq
 
 # Defaults
-kw_list     = ['Harvard','Princeton','Yale'] #,'Dartmouth','Cornell','Stanford']
+kw_list     = ['Harvard','Princeton','Yale','Stanford','Dartmouth'] #,'Tufts']
 date_start  = '2016-06-01'
 date_end    = '' # Leave blank for up until today
 #frequency   = 'hourly' # weekly, monthly, daily, hourly are options
