@@ -2,24 +2,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # =============================================================================
-# Imports and Setup
+# Imports
 # =============================================================================
 
 # Standard data analysis
 import pandas as pd
-#import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
 import time
 
 # An unofficial google trends API
 from pytrends.request import TrendReq
 
-# Defaults
-kw_list     = ['Harvard','Princeton','Yale','Stanford','Dartmouth'] #,'Tufts']
-date_start  = '2016-06-01'
+# =============================================================================
+# Defaults (To Be Changed)
+# =============================================================================
+
+kw_list     = ['Flu','Epidemic','Pandemic','Outbreak','Disease','Sickness']
+date_start  = '2017-10-01'
 date_end    = '' # Leave blank for up until today
-#frequency   = 'hourly' # weekly, monthly, daily, hourly are options
+frequency   = 'daily' # daily, weekly, monthly, quarterly
 geo         = 'US'
+
+
+# =============================================================================
+# Setup (Should Usually Not Be Changed)
+# =============================================================================
 
 # Initialize pytrend
 pytrend = TrendReq(tz=300) # tz is the timezone offset, in this case EST
@@ -29,11 +36,13 @@ cutoff = 270 - 20 # google returns max 270 values; I make it 250 just in case.
 overlap = 30 # An arbitrary length of time for the series to overlap
 
 
-# Limit on google trends searches is 5 words, need to have benchmark if exceeds this
+# Limit on google trends searches is 5 words, need benchmark term if exceeds this
 if len(kw_list)//5 >= 1:
     benchmark = kw_list[0]
+    print('Running Search with Benchmark as %s' %benchmark)
 else:
     benchmark = None
+    print('Running Search with no benchmark necessary')
 
 
 # =============================================================================
@@ -76,12 +85,12 @@ def timechunks(date_start=date_start, date_end=date_end,
     return lst
 
 
-def too_small(x,tol=.5):
+def too_small(x,tol=.2):
     """
     Checks whether a pd.Series has any 0s or "too many" ones
     Inputs:
         x is pd.Series
-        tol is the percentage of ones allowable (default=10%)
+        tol is the percentage of ones allowable (default=20%)
     Returns:
         True/False
     """
@@ -96,8 +105,6 @@ def too_small(x,tol=.5):
 def normalize(x):
     return (x-x.mean())/x.std()
 
-# def date_to_int(x):
-#     return int(str(x.year)+str(x.month).zfill(2)+str(x.day).zfill(2))
 
 def pull_timeframe(pytrend=pytrend, kw_list=kw_list, benchmark=benchmark,
                    geo=geo, date_start=date_start, date_end=date_end):
@@ -150,7 +157,7 @@ def pull_timeframe(pytrend=pytrend, kw_list=kw_list, benchmark=benchmark,
                                  'Please choose a different first search term.')
                 break
 
-            # Get rid of partial weeks
+            # Get rid of partial days
             df = df.loc[df.isPartial.astype('str').eq('False'),ss]
 
             if idx==0:
@@ -190,37 +197,36 @@ for ii, dd in enumerate(timechunks()):
         # append the new part
         trends = trends.append(temp_trends.iloc[overlap+1:])
 
+
+if frequency == 'daily':
+    pass
+elif frequency == 'weekly':
+    trends = trends.reset_index()
+    trends.date = trends.date.dt.to_period('W').dt.to_timestamp() # make weekly
+    trends.loc[:,'timecount'] = trends.groupby('date')['date'].transform('count')
+    trends = trends.loc[trends.timecount.eq(7),:] # make sure no partial weeks
+    trends = trends.groupby('date')[kw_list].mean()
+    print('Converting to %s' %frequency)
+elif frequency == 'monthly':
+    trends = trends.reset_index()
+    trends.date = trends.date.dt.to_period('M').dt.to_timestamp() # make monthly
+    trends.loc[:,'timecount'] = trends.groupby('date')['date'].transform('count')
+    trends = trends.loc[trends.timecount.eq(trends.date.dt.days_in_month),:]
+    trends = trends.groupby('date')[kw_list].mean()
+    print('Converting to %s' %frequency)
+elif frequency == 'quarterly':
+    trends = trends.reset_index()
+    trends.date = trends.date.dt.to_period('Q').dt.to_timestamp() # make monthly
+    trends.loc[:,'timecount'] = trends.groupby('date')['date'].transform('count')
+    trends = trends.loc[trends.timecount.ge(28*3),:] # minimum February 3 times
+    trends = trends.groupby('date')[kw_list].mean()
+    print('Converting to %s' %frequency)
+
+
 indices = pd.concat([
     trends.apply(normalize).sum(axis=1).to_frame('GTI (Normalized)'),
-    trends.sum(axis=1).to_frame('GTI (Standard)')
-    ],axis=1).apply(normalize)
+    trends.sum(axis=1).to_frame('GTI (Standard)')],axis=1).apply(normalize)
 
 indices.plot()
-
-
-
-#%% Extra stuff for now
-
-# #TODO: Loop over possibilities
-#Discovery made: if it is <= 270 days then it spits out daily, if it is < 270 weeks, then it spits out weekly
-# if daterange//52 >= 270 and (frequency == 'daily' or frequency == 'hourly'):
-#     raise ValueError('It is not currently possible to run daily/hourly '\
-#                      'frequency with a timerange exceeding 5 years.')
-
-# if daterange//52 >= 270 and (frequency == 'daily' or frequency == 'hourly'):
-#     raise ValueError('It is not currently possible to run daily/hourly '\
-#                      'frequency with a timerange exceeding 5 years.')
-# elif daterange//52 >= 270 and frequency == 'monthly':
-#     print('cool')
-#     # execute code as it is. no need to partition
-# elif daterange//52 >= 270 and frequency == 'weekly':
-#     print('nipples')
-#     # run overlapping code of 5 year lengths
-
-# elif daterange//365 < 5 and frequency == 'monthly':
-#     print('what')
-# elif daterange//365 < 5 and frequency == 'weekly':
-#     # execute code as is. no need to partition
-# elif daterange//365 < 5 and frequency == 'weekly':
 
 
