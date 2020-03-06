@@ -15,7 +15,7 @@ from io import StringIO
 from pandas._config import get_option
 from pandas.io.formats import console
 
-class WBTrends:
+class Trendex:
     """
     This class makes an index utilizing Google Trends from keywords.
 
