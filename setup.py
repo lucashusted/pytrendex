@@ -9,12 +9,12 @@ with io.open(os.path.join(dir, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='wb_gtrends',
-    version='1.0',
+    name='pytrendex',
+    version='0.0.1',
     description='Tool To Create Google Trends Index From Keywords',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/lucashusted/wb_gtrends',
+    url='https://github.com/lucashusted/pytrendex',
     author='Lucas Husted',
     author_email='lfh2119@columbia.edu',
     license='GNU',
