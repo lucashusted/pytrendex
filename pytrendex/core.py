@@ -5,6 +5,7 @@
 # =============================================================================
 # Standard data analysis
 import pandas as pd
+from numpy.random import random as randn
 import time
 
 # An unofficial google trends API
@@ -40,12 +41,22 @@ class Trendex:
         The frequency of the index. Note that the index always pulls daily data,
         so collapsing into larger time-frames is done by averages ex-post.
 
-    make_index: Binary, optional
+    gen_index: Binary, optional
         If true, then go ahead and instantiate class to generate indices.
         Default is True.
 
     plot: boolean, optional
         If True, and make_index is True, then it plots index. Default is true.
+
+    kw_list_split: boolean, optional
+        If True then the max length for kw_list is 20 terms; after that it will
+        split the search by using the "+" option for search terms (which acts
+        as an "or" operator for google trends). Highly recommended to keep load down.
+
+    slowdown: boolean, optional
+        If True then include time.sleep() at key moments to slow down the index.
+        Currently defaults to random intervals of mean 5 or 7 seconds depending on
+        where in the code. Remove this at your own peril (Google lockout).
 
 
     Returns (back to class instance)
@@ -84,30 +95,45 @@ class Trendex:
     # Universal parameter(s)
     cutoff = 270 - 20 # google returns max 270 values; I make it 250 just in case.
     overlap = 30 # An arbitrary length of time for the series to overlap
+    kw_limit = 20 # Default is to break kw_list into chunks with "+" operator
 
-    def __init__(self, kw_list, geo, date_start=None, date_end=None,
-                 frequency='daily', make_index=True, plot=True):
+    def __init__(self, kw_list, geo, date_start=None, date_end=None, frequency='daily',
+                 gen_index=True, plot=True, kw_list_split=True, slowdown=True):
 
         # Input Arguments
-        self.kw_list = kw_list
+        self.user_kw_list = kw_list
         self.geo = geo
         self.user_date_start = date_start
         self.user_date_end = date_end
         self.frequency = frequency
+        self.slowdown = slowdown
 
         # Derived Arguments
+        if len(kw_list)>self.kw_limit & kw_list_split:
+            self.kw_list = self.combine_kw_list(kw_list)
+        else:
+            self.kw_list = kw_list
         self.benchmark, self.search_groups = self.get_benchmark()
         self.date_start, self.date_end = self.auto_dates()
         self.timechunks = self.get_timechunks()
 
-        # Make the index, unless False:
-        if make_index:
-            self = self.make_index(plot=plot)
+        # Initialized None Arguments For make_index
+        self.raw_trends = None
+        self.adjustment_factors = None
+        self.raw_trends = None
+        self.raw_trends_adjusted = None
+        self.trends = None
+        self.indices = None
+
+
+        # Make the Index, unless False:
+        if gen_index:
+            self.make_index(plot=plot)
 
     def __repr__(self) -> str:
 
         # Return info on how to generate indices
-        if not hasattr(self, 'indices'):
+        if self.indices is None:
             result = 'An instantiation of WBTrends Class. '\
                 'Run make_index() to get result'
             return result
@@ -189,6 +215,9 @@ class Trendex:
         self.adjustment_factors = {}
         # Loop through and get all the separate time frames (timechunks makes the intervals)
         for ii, dd in enumerate(self.timechunks):
+            if self.slowdown:
+                time.sleep(round(randn()*6+2,2)) # sleep it so no timeout
+            # iterate through and pull the timeframes
             temp_trends = self.pull_timeframe(date_start=dd[0],date_end=dd[1])
             self.raw_trends[ii] = temp_trends
             if ii==0:
@@ -223,21 +252,18 @@ class Trendex:
             trends.loc[:,'timecount'] = trends.groupby('date')['date'].transform('count')
             trends = trends.loc[trends.timecount.eq(7),:] # make sure no partial weeks
             trends = trends.groupby('date')[self.kw_list].mean()
-            print('Converting to %s' %self.frequency)
         elif self.frequency == 'monthly':
             trends = trends.reset_index()
             trends.date = trends.date.dt.to_period('M').dt.to_timestamp() # make monthly
             trends.loc[:,'timecount'] = trends.groupby('date')['date'].transform('count')
             trends = trends.loc[trends.timecount.eq(trends.date.dt.days_in_month),:]
             trends = trends.groupby('date')[self.kw_list].mean()
-            print('Converting to %s' %self.frequency)
         elif self.frequency == 'quarterly':
             trends = trends.reset_index()
             trends.date = trends.date.dt.to_period('Q').dt.to_timestamp() # make qtrly
             trends.loc[:,'timecount'] = trends.groupby('date')['date'].transform('count')
             trends = trends.loc[trends.timecount.ge(28*3),:] # minimum February 3 times
             trends = trends.groupby('date')[self.kw_list].mean()
-            print('Converting to %s' %self.frequency)
 
         # Save also the collapsed trend series
         self.trends = trends
@@ -305,7 +331,8 @@ class Trendex:
             # Do the searches in batches
             # For each one initial transform and spit into dictionary of dataframes
             for idx, ss in enumerate(self.search_groups):
-
+                if self.slowdown:
+                    time.sleep(round(randn()*4+2,2)) # sleep it so no timeout
                 # Do the search
                 self.pytrend.build_payload(ss,geo=self.geo,
                                       timeframe='%s %s' %(date_start,
@@ -394,6 +421,21 @@ class Trendex:
         bench = lst[0]
         for i in range(1, len(lst), n-1):
             yield [bench] + lst[i:i+n-1]
+
+    @staticmethod
+    def combine_kw_list(lst,n=100):
+        """Combine long kw_list into "+" separated chunks"""
+        for ii,jj in enumerate(lst):
+            if ii==0:
+                temp = jj
+                master = []
+            else:
+                if len(temp+' + '+jj)<n:
+                    temp+= ' + ' + jj
+                else:
+                    master.append(temp)
+                    temp = jj
+        return master
 
     @staticmethod
     def too_small(x,tol=.2):

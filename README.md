@@ -48,6 +48,15 @@ This class makes an index utilizing Google Trends from keywords.
 - `plot`: boolean, optional
       If True, and make_index is True, then it plots index. Default is true.
 
+- `kw_list_split`: boolean, optional
+      If True then the max length for kw_list is 20 terms; after that it will
+      split the search by using the "+" option for search terms (which acts
+      as an "or" operator for google trends). Highly recommended to keep load down.
+
+- `slowdown`: boolean, optional
+      If True then include time.sleep() at key moments to slow down the index.
+      Currently defaults to random intervals of mean 5 or 7 seconds depending on
+      where in the code. Remove this at your own peril (Google lockout).
 
 ### Returns (back to class instance)
 - `self.indices`: Dataframe

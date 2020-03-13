@@ -10,15 +10,24 @@ with io.open(os.path.join(dir, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='pytrendex',
-    version='0.0.1',
+    version='1.0.0',
     description='Tool To Create Google Trends Index From Keywords',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/lucashusted/pytrendex',
     author='Lucas Husted',
-    author_email='lfh2119@columbia.edu',
+    author_email='lucas.f.husted@columbia.edu',
     license='GNU',
-    install_requires=['pytrends','requests', 'pandas>=0.25', 'lxml','matplotlib'],
+    classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Developers',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        ],
+    install_requires=['pytrends','requests','numpy','pandas>=0.25', 'lxml','matplotlib'],
     python_requires='>=3',
     packages=find_packages()
 )
