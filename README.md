@@ -2,18 +2,9 @@
 Code to generate a Google Trends Index
 
 ## Installation
-If there is already a `pytrendex-[xxx].tar.gz` file, then unzip the file and run:
 ```
-pip install -e pytrendex-[xxx]
+pip install pytrendex
 ```
-where the final argument is the unzipped folder.
-
-If there is no `.tar.gz` file, then you will need one additional step. Navigate to
-the file `setup.py` and run:
-```
-python setup.py sdist
-```
-This will create the necessary file.
 
 
 ## Trendex
