@@ -7,6 +7,7 @@
 import pandas as pd
 from numpy.random import random as randn
 import time
+import warnings
 
 # An unofficial google trends API
 from pytrends.request import TrendReq
@@ -28,6 +29,9 @@ class Trendex:
 
     geo: str
         The country or place the search is conducted in, see Trends documentation.
+
+    lang: str, options are currently 'en' for english and 'es' for spanish
+        The language that the kw list is (required for optimal benchmark selection).
 
     date_start: str, optional
         The data where the index starts in format: 'yyyy-mm-dd',
@@ -52,6 +56,11 @@ class Trendex:
         If True then the max length for kw_list is 20 terms; after that it will
         split the search by using the "+" option for search terms (which acts
         as an "or" operator for google trends). Highly recommended to keep load down.
+
+    benchmark_select: boolean, optional
+        If True then optimally search over timeframe for best benchmark phrase, see
+        documentation for that function for description of how this is done.
+        If False, then the benchmark will be the first term in the kw_list.
 
     slowdown: boolean, optional
         If True then include time.sleep() at key moments to slow down the index.
@@ -97,16 +106,18 @@ class Trendex:
     overlap = 30 # An arbitrary length of time for the series to overlap
     kw_limit = 20 # Default is to break kw_list into chunks with "+" operator
 
-    def __init__(self, kw_list, geo, date_start=None, date_end=None, frequency='daily',
-                 gen_index=True, plot=True, kw_list_split=True, slowdown=True):
+    def __init__(self, kw_list, geo, lang, date_start=None, date_end=None, frequency='daily',
+        gen_index=True, plot=True, kw_list_split=True, benchmark_select=True, slowdown=True):
 
         # Input Arguments
         self.user_kw_list = kw_list
         self.geo = geo
+        self.lang = lang
         self.user_date_start = date_start
         self.user_date_end = date_end
         self.frequency = frequency
         self.slowdown = slowdown
+        self.benchmark_select = benchmark_select
 
         # Derived Arguments
         if len(kw_list)>self.kw_limit and kw_list_split:
@@ -281,8 +292,6 @@ class Trendex:
 
         return self
 
-
-
     def pull_timeframe(self, date_start=None, date_end=None):
         """
         This function pulls data from a set timeframe for all variables in kw_list.
@@ -340,13 +349,23 @@ class Trendex:
                 df = self.pytrend.interest_over_time()
 
                 # Warn and stop if benchmark sucks
-                if self.too_small(df[self.benchmark]):
-                    raise ValueError('The benchmark has too many 0 or small values. '\
-                                     'Please choose a different first search term.')
-                    break
+                if not self.benchmark_select
+                    if self.too_small(df[self.benchmark]):
+                        raise ValueError('The benchmark has too many 0 or small values. '\
+                                         'Please choose a different first search term '\
+                                         'or choose optimally.')
+                        break
+                else:
+                    if self.too_small(df[self.benchmark]):
+                        warnings.warn('Benchmark term %s is optimatlly selected, '\
+                        'but performs poorly between %s and %s, '\
+                        'will automatically adjust' %(self.benchmark,date_start,date_end))
 
                 # Get rid of partial days
                 df = df.loc[df.isPartial.astype('str').eq('False'),ss]
+
+                # Just in case replace 0 values in the benchmark with 1's
+                df[self.benchmark] = df[self.benchmark].replace({0:1})
 
                 if idx==0:
                     trends = df
@@ -365,9 +384,15 @@ class Trendex:
 
     def get_benchmark(self):
         # Limit on google trends searches is 5 words else need benchmark term
-        if len(self.kw_list) > 5:
+        if len(self.kw_list) > 5 and not benchmark_select:
             benchmark = self.kw_list[0]
             search_groups = list(self.chunks(self.kw_list))
+        elif len(self.kw_list) > 5 and benchmark_select:
+            benchmark = self.optimal_benchmark()
+            words = self.kw_list
+            # put optimal benchmark first here
+            words.insert(0, words.pop(words.index(benchmark)))
+            search_groups = list(self.chunks(words))
         else:
             benchmark = None
             search_groups = self.kw_list
@@ -414,6 +439,48 @@ class Trendex:
             lst = [[self.date_start,self.date_end]]
 
         return lst
+
+    def optimal_benchmark(self):
+        """
+        Run generic searches over the timeframe to calculate best potential index:
+
+        The function takes the self object, analyzes the language of the kw_list and
+        runs searches over the entire timeframe, comparing the average of the series to
+        football (english) or futbol + fútbol (spanish).
+
+        The highest average over the timeframe (making sure there are not years
+        with 0 average is selected as benchmark).
+        """
+
+        if self.lang = 'es':
+            popterm = 'fútbol'
+        elif self.lang = 'en':
+            popterm = 'football'
+        else:
+            raise ValueError('Currently only supports English (en) and Spanish (es)')
+
+        chunks = list(self.chunks([popterm]+self.kw_list))
+
+        for index,chunk in enumerate(chunks):
+            self.pytrend.build_payload(chunk,geo=self.geo,
+                                  timeframe='%s %s' %(self.date_start,self.date_end))
+            temp = self.pytrend.interest_over_time()
+            temp = temp.loc[temp.isPartial.astype('str').eq('False'),chunk].drop(columns=popterm)
+
+            if index==0:
+                df = temp
+            else:
+                df = df.join(temp)
+
+        # Returns number of nonzero years
+        teststats = df.resample('Y').mean().apply(lambda x: x.eq(0).eq(False))\
+                                           .sum().rename('numnonzero').to_frame()
+        # Returns the mean over time of each potential benchmark
+        teststats = teststats.join(df.mean(axis=0).rename('meanval').to_frame())
+        # sorts it, the best is the highest mean among highest nonzero years
+        teststats = teststats.sort_values(['numnonzero','meanval'],ascending=False)
+
+        return teststats.index[0]
 
     @staticmethod
     def chunks(lst, n=5):
