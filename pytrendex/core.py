@@ -349,7 +349,7 @@ class Trendex:
                 df = self.pytrend.interest_over_time()
 
                 # Warn and stop if benchmark sucks
-                if not self.benchmark_select
+                if not self.benchmark_select:
                     if self.too_small(df[self.benchmark]):
                         raise ValueError('The benchmark has too many 0 or small values. '\
                                          'Please choose a different first search term '\
@@ -452,9 +452,9 @@ class Trendex:
         with 0 average is selected as benchmark).
         """
 
-        if self.lang = 'es':
+        if self.lang == 'es':
             popterm = 'fútbol'
-        elif self.lang = 'en':
+        elif self.lang == 'en':
             popterm = 'football'
         else:
             raise ValueError('Currently only supports English (en) and Spanish (es)')
