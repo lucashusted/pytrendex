@@ -20,6 +20,9 @@ This class makes an index utilizing Google Trends from keywords.
 - `geo`: str
       The country or place the search is conducted in, see Trends documentation.
 
+- `lang`: str, options are currently `en` for english and `es` for spanish
+      The language that the `kw_list` is (required for optimal benchmark selection).
+
 - `date_start`: str, optional
       The data where the index starts in format: 'yyyy-mm-dd',
       if none provided, then does it at the cutoff days before the date end.
@@ -40,9 +43,14 @@ This class makes an index utilizing Google Trends from keywords.
       If True, and make_index is True, then it plots index. Default is true.
 
 - `kw_list_split`: boolean, optional
-      If True then the max length for kw_list is 20 terms; after that it will
+      If True then the max length for `kw_list` is 20 terms; after that it will
       split the search by using the "+" option for search terms (which acts
       as an "or" operator for google trends). Highly recommended to keep load down.
+
+- `benchmark_select`: boolean, optional
+      If True then optimally search over timeframe for best benchmark phrase, see
+      documentation for that function for description of how this is done.
+      If False, then the benchmark will be the first term in the `kw_list`.
 
 - `slowdown`: boolean, optional
       If True then include time.sleep() at key moments to slow down the index.
@@ -82,13 +90,13 @@ A use case example is provided here:
 ```
 from pytrendex import Trendex
 
-kw_list = ['Trump','Obama','Biden','Clinton','Warren','Bernie']
+kw_list = ['Obama','Biden','Clinton','Warren','Trump','Bernie']
 geo = 'US'
 date_start = '2018-01-01'
 frequency = 'weekly'
 
 ## Generating the indexes in two different ways
-result = Trendex(kw_list=kw_list,geo=geo,date_start=date_start,frequency=frequency)
+result = Trendex(kw_list=kw_list,geo=geo,lang='en',date_start=date_start,frequency=frequency)
 
 # A smaller index, here we create it in two steps (date start and end and frequency auto selected)
 result2 = Trendex(['Obama','Trump'],geo='US',make_index=False)

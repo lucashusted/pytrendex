@@ -110,7 +110,7 @@ class Trendex:
         gen_index=True, plot=True, kw_list_split=True, benchmark_select=True, slowdown=True):
 
         # Input Arguments
-        self.user_kw_list = kw_list
+        self.user_kw_list = kw_list.copy()
         self.geo = geo
         self.lang = lang
         self.user_date_start = date_start
@@ -124,8 +124,9 @@ class Trendex:
             self.kw_list = self.combine_kw_list(kw_list)
         else:
             self.kw_list = kw_list
-        self.benchmark, self.search_groups = self.get_benchmark()
         self.date_start, self.date_end = self.auto_dates()
+        self.benchmark, self.search_groups = self.get_benchmark()
+
         self.timechunks = self.get_timechunks()
 
         # Initialized None Arguments For make_index
@@ -384,12 +385,12 @@ class Trendex:
 
     def get_benchmark(self):
         # Limit on google trends searches is 5 words else need benchmark term
-        if len(self.kw_list) > 5 and not benchmark_select:
+        if len(self.kw_list) > 5 and not self.benchmark_select:
             benchmark = self.kw_list[0]
             search_groups = list(self.chunks(self.kw_list))
-        elif len(self.kw_list) > 5 and benchmark_select:
+        elif len(self.kw_list) > 5 and self.benchmark_select:
             benchmark = self.optimal_benchmark()
-            words = self.kw_list
+            words = self.kw_list.copy()
             # put optimal benchmark first here
             words.insert(0, words.pop(words.index(benchmark)))
             search_groups = list(self.chunks(words))
