@@ -109,7 +109,7 @@ class Trendex:
         self.slowdown = slowdown
 
         # Derived Arguments
-        if len(kw_list)>self.kw_limit & kw_list_split:
+        if len(kw_list)>self.kw_limit and kw_list_split:
             self.kw_list = self.combine_kw_list(kw_list)
         else:
             self.kw_list = kw_list

@@ -10,13 +10,14 @@ Special Notes:
     2. I search 2006 through 2017, which seems right given their paper.
 
 When last run, results were:
-    1. Correlation with GTU in paper: 0.84
-    2. Correlation with BBD in paper: 0.28, Correlation found here: 0.27
+    1. Correlation with GTU in paper: 0.88
+    2. Correlation with BBD in paper: 0.28, Correlation found here: 0.25
 
 '''
 import pandas as pd
 from pytrendex import Trendex
-
+import seaborn as sns; sns.set()
+import matplotlib.pyplot as plt
 
 # =============================================================================
 # Making GTU Index from Castelnuovo and Tran (2017)
@@ -143,3 +144,18 @@ corr_report_orig = df.gti.corr(df.GTU_US).round(2)
 
 print('Correlation with GTU in paper: %s' %corr_report_orig)
 print('Correlation with BBD in paper: 0.28,','Correlation found here: %s' %corr_report_epu)
+
+
+df = df.loc[pd.IndexSlice[:'2016-12-31']]
+df.GTU_US = (df.GTU_US-df.GTU_US.mean())/df.GTU_US.std()
+df.gti = (df.gti-df.gti.mean())/df.gti.std()
+
+fig, ax = plt.subplots()
+df.plot(y='gti',ax=ax,label='My GTU')
+df.plot(y='GTU_US',ax=ax,label='Original GTU')
+plt.xlabel('Date',fontsize='medium')
+plt.xticks(rotation=0,horizontalalignment='center')
+plt.ylabel('Index (Mean = 0, Std. = 1)',fontsize='medium')
+ax.get_figure().savefig('gtu_original_new.png',
+              dpi=600, format='png', bbox_inches='tight'
+              )
