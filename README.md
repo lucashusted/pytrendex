@@ -57,8 +57,19 @@ This class makes an index utilizing Google Trends from keywords.
       Currently defaults to random intervals of mean 5 or 7 seconds depending on
       where in the code. Remove this at your own peril (Google lockout).
 
+- `seasonal_adjust`: boolean, optional (default = True)
+      If True, then seasonally adjust the series (recommended). Seasonally
+      adjusted trends are always constructed and saved in trends_sa,
+      but this incorporates them into the index that is automatically constructed.
+
+- `sa_method`: str, optional (default = 'trends')
+      Three methods are acceptable: 'trends' or 'index' or 'both'.
+      The trends method seasonally adjusts each trend separately (before adding).
+      The index method seasonally adjusts only the final series.
+      The both method seasonally adjusts separately and the final index.
+
 ### Returns (back to class instance)
-- `self.indices`: Dataframe
+- `self.gti`: Series
       This is the normalized indexes made from the underlying data. It is
       the main thing returned from this function.
 
@@ -104,8 +115,8 @@ result2 = result2.make_index(plot=False)
 
 ## Analyzing the results
 
-result.indices.plot() # creates a matplotlib of the plot for us to look at
-result2.trends.plot() # plots the adjusted individual terms that make up the index
+result.gti.plot() # creates a matplotlib of the plot for us to look at
+result2.gti.plot() # plots the adjusted individual terms that make up the index
 
 result.indices.to_csv('file.csv') # saves the indices as a csv file
 

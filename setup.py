@@ -12,7 +12,7 @@ with io.open(os.path.join(dir, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='pytrendex',
-    version='2.1.1',
+    version='3.0.0',
     description='Tool To Create Google Trends Index From Keywords',
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -29,7 +29,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         ],
-    install_requires=['pytrends','requests','numpy','pandas>=0.25', 'lxml','matplotlib'],
+    install_requires=['pytrends','requests','numpy','statsmodels','pandas>=0.25', 'lxml','matplotlib'],
     python_requires='>=3',
     packages=find_packages()
 )
