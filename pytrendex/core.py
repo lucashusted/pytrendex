@@ -5,17 +5,12 @@
 # =============================================================================
 # Standard data analysis
 import pandas as pd
-from numpy.random import random as randn
+from numpy.random import random
 import time
 from statsmodels.api import tsa
 
 # An unofficial google trends API
 from pytrends.request import TrendReq
-
-# This is for docstrings and representations of the indices
-from io import StringIO
-from pandas._config import get_option
-from pandas.io.formats import console
 
 class Trendex:
     """
@@ -72,43 +67,32 @@ class Trendex:
         adjusted trends are always constructed and saved in trends_sa,
         but this incorporates them into the index that is automatically constructed.
 
-    sa_method: str, optional (default = 'trends')
-        Three methods are acceptable: 'trends' or 'index' or 'both'.
-        The trends method seasonally adjusts each trend separately (before adding).
-        The index method seasonally adjusts only the final series.
-        The both method seasonally adjusts separately and the final index.
-
-
-
-
     Returns (back to class instance)
     -------
-    self.gti: Series
+    self.gti: Series (main output)
         This is the normalized indexes made from the underlying data. It is
         the main thing returned from this function.
 
-    self.trends: Dataframe
+    self.trends: Dataframe (major output)
         It is the adjusted and combined series for each term searched.
         You could use this to plot individual keywords in the index.
         Will differ from raw_trends_adjusted if frequency is changed from daily.
 
-    self.trends_sa: Dataframe
+    self.trends_sa: Dataframe (major output)
         It is the trends dataframe where each trend has been seasonally adjusted.
 
-    self.raw_trends_adjusted: Dictionary
+    self.raw_trends_adjusted: Dictionary (minor output)
         These are the adjusted (using overlapping timeframes) raw results
         for each term. Index of dictionary corresponds to index of timechunks.
         Could differ from trends if frequency is changed from daily.
 
-    self.raw_trends: Dictionary
+    self.raw_trends: Dictionary (minor output)
         These are the unadjusted raw results for each term.
         Note: Adjustment has still been made by the benchmark term for
         searches exceeding 5 terms.
 
-    self.adjustment_factors: Series
+    self.adjustment_factors: Series (minor output)
         Returns the adjustment factors used on each overlapping segment.
-        [term]_1 is the mean of the term in the earlier segment.
-        [term]_2 is the mean of the term in the later segment.
         The adjustment is [term]_1/[term_2] * segment_2
         Note: means for each segment are bounded from below by 1, so that
         we do not seriously alter indices.
@@ -118,14 +102,14 @@ class Trendex:
     pytrend = TrendReq(tz=300) # tz is the timezone offset, in this case EST
 
     # Universal parameter(s)
-    cutoff = 270 - 20 # google returns max 270 values; I make it 250 just in case.
-    overlap = 30 # An arbitrary length of time for the series to overlap
+    cutoff_d = 270 - 10 # google returns max 270 values; I make it 260 just in case.
+    cutoff_m = 270*7 + 10
+    overlap = 45 # An arbitrary (long) length of time for the series to overlap
     kw_limit = 20 # Default is to break kw_list into chunks with "+" operator
 
     def __init__(self, kw_list, geo, lang, date_start=None, date_end=None,
-                 frequency='daily', gen_index=True, plot=True,
-                 kw_list_split=True, benchmark_select=True, slowdown=True,
-                 seasonal_adjust=True, sa_method='trends'):
+                 frequency='daily', gen_index=True, plot=True, seasonal_adjust=True,
+                 kw_list_split=True, benchmark_select=True, slowdown=True):
 
         # Input Arguments
         self.user_kw_list = kw_list.copy()
@@ -134,7 +118,6 @@ class Trendex:
         self.user_date_start = date_start
         self.user_date_end = date_end
         self.frequency = frequency
-        self.sa_method = sa_method
         self.seasonal = seasonal_adjust
         self.slowdown = slowdown
         self.benchmark_select = benchmark_select
@@ -147,7 +130,10 @@ class Trendex:
         self.date_start, self.date_end = self.auto_dates()
         self.benchmark, self.search_groups = self.get_benchmark()
 
-        self.timechunks = self.get_timechunks()
+        if frequency == 'daily' or frequency == 'weekly':
+            self.timechunks = self.get_timechunks()
+        else:
+            self.timechunks = [[self.date_start,self.date_end]]
 
         # Initialized None Arguments For make_index
         self.raw_trends = None
@@ -171,35 +157,7 @@ class Trendex:
                 'Run make_index() to get result'
             return result
 
-
-        # Otherwise return a string representation for indices attribute.
-        df = self.gti
-        buf = StringIO("")
-        if df._info_repr():
-            df.info(buf=buf)
-            return buf.getvalue()
-
-        max_rows = get_option("display.max_rows")
-        min_rows = get_option("display.min_rows")
-        max_cols = get_option("display.max_columns")
-        max_colwidth = get_option("display.max_colwidth")
-        show_dimensions = get_option("display.show_dimensions")
-        if get_option("display.expand_frame_repr"):
-            width, _ = console.get_console_size()
-        else:
-            width = None
-        df.to_string(
-            buf=buf,
-            max_rows=max_rows,
-            min_rows=min_rows,
-            max_cols=max_cols,
-            line_width=width,
-            max_colwidth=max_colwidth,
-            show_dimensions=show_dimensions,
-        )
-
-        return '\n'.join(['The Calculated Index (stored in object.gti):'
-                          ,buf.getvalue()])
+        return 'An instantiation of WBTrends Class. Index is self.gti'
 
     def make_index(self,plot=True):
         """
@@ -248,34 +206,35 @@ class Trendex:
         self.adjustment_factors = {}
         # Loop through and get all the separate time frames (timechunks makes the intervals)
         for ii, dd in enumerate(self.timechunks):
-            if self.slowdown:
-                time.sleep(round(randn()*6+2,2)) # sleep it so no timeout
             # iterate through and pull the timeframes
             temp_trends = self.pull_timeframe(date_start=dd[0],date_end=dd[1])
-            self.raw_trends[ii] = temp_trends
+            self.raw_trends[ii] = temp_trends.copy()
             if ii==0:
-                trends = temp_trends
+                trends = temp_trends.copy()
             else:
+                temp_trends = temp_trends.copy()
+                if self.slowdown:
+                    time.sleep(round(random()*6+2,2)) # sleep it so no timeout
                 # Calculate the means of the overlapping part
-                meanadj = trends.join(temp_trends,how='inner',
-                                      lsuffix='_1',rsuffix='_2').mean()
+                meanadj = trends.join(temp_trends.copy(),how='inner',
+                                      lsuffix='_1',rsuffix='_2').replace({0:1})
+                for jj in temp_trends.columns:
+                    meanadj['%s' %jj] = meanadj['%s_1' %jj]/meanadj['%s_2' %jj]
+                    meanadj = meanadj.drop(columns=['%s_1' %jj,'%s_2' %jj])
 
-                # make it so that the minimum is 1 when we do this overlap
-                meanadj = meanadj.apply(lambda x: 1 if x<1 else x)
-
+                meanadj = meanadj.mean()
                 # save them too so we can recover them if needed
-                self.adjustment_factors[ii] = meanadj
+                self.adjustment_factors[ii] = meanadj.copy()
 
                 for jj in temp_trends.columns:
                     # adjust the following parts to have the same overlap mean
-                    temp_trends.loc[:,jj] = temp_trends.loc[:,jj].values*\
-                        (meanadj['%s_1' %jj]/meanadj['%s_2' %jj])
+                    temp_trends.loc[:,jj] = temp_trends.loc[:,jj].values*meanadj[jj]
 
                 # append the new part
-                trends = trends.append(temp_trends.iloc[self.overlap+1:])
+                trends = trends.append(temp_trends.iloc[self.overlap+1:]).copy()
 
         # Save the adjusted trends too
-        self.raw_trends_adjusted = trends
+        self.raw_trends_adjusted = trends.copy()
 
         if self.frequency == 'daily':
             pass
@@ -286,47 +245,30 @@ class Trendex:
             trends = trends.loc[trends.timecount.eq(7),:] # make sure no partial weeks
             trends = trends.groupby('date')[self.kw_list].mean()
         elif self.frequency == 'monthly':
-            trends = trends.reset_index()
-            trends.date = trends.date.dt.to_period('M').dt.to_timestamp() # make monthly
-            trends.loc[:,'timecount'] = trends.groupby('date')['date'].transform('count')
-            trends = trends.loc[trends.timecount.eq(trends.date.dt.days_in_month),:]
-            trends = trends.groupby('date')[self.kw_list].mean()
+            pass
         elif self.frequency == 'quarterly':
             trends = trends.reset_index()
             trends.date = trends.date.dt.to_period('Q').dt.to_timestamp() # make qtrly
             trends.loc[:,'timecount'] = trends.groupby('date')['date'].transform('count')
-            trends = trends.loc[trends.timecount.ge(28*3),:] # minimum February 3 times
+            trends = trends.loc[trends.timecount.eq(3),:] # has to have 3 months
             trends = trends.groupby('date')[self.kw_list].mean()
 
         # Save also the collapsed trend series
-        self.trends = trends
+        self.trends = trends.copy()
         trends_sa = trends.apply(self.sadjust,axis=0)
-        self.trends_sa = trends_sa
+        self.trends_sa = trends_sa.copy()
 
-
-        # Old way
-        # indices = pd.concat([
-        #         trends_sa.apply(self.normalize).sum(axis=1).to_frame('GTI (Normalized)'),
-        #         trends_sa.sum(axis=1).to_frame('GTI (Standard)')
-        #         ],axis=1).apply(self.normalize)
-        if self.seasonal and self.sa_method == 'trends':
-            indices = self.normalize(trends_sa.sum(axis=1))
-            indices.name = 'GTI'
-        elif self.seasonal and self.sa_method == 'index':
+        if self.seasonal:
             indices = self.normalize(self.sadjust(trends.sum(axis=1)))
-            indices.name = 'GTI'
-        elif self.season and self.sa_method == 'both':
-            indices = self.normalize(self.sadjust(trends_sa.sum(axis=1)))
-            indices.name = 'GTI'
         else:
             indices = self.normalize(trends.sum(axis=1))
-            indices.name = 'GTI'
+        indices.name = 'GTI'
 
         if plot:
             indices.plot()
 
         # The final thing is to add the indices
-        self.gti = indices
+        self.gti = indices.copy()
 
         return self
 
@@ -373,18 +315,20 @@ class Trendex:
         if not date_end:
             date_end = self.date_end
 
+        small_dum = False
 
         if self.benchmark:
             # Do the searches in batches
             # For each one initial transform and spit into dictionary of dataframes
             for idx, ss in enumerate(self.search_groups):
                 if self.slowdown:
-                    time.sleep(round(randn()*4+2,2)) # sleep it so no timeout
+                    time.sleep(round(random()*4+2,2)) # sleep it so no timeout
                 # Do the search
                 self.pytrend.build_payload(ss,geo=self.geo,
                                       timeframe='%s %s' %(date_start,
                                                           date_end))
                 df = self.pytrend.interest_over_time()
+                df = df.copy()
 
                 # Warn and stop if benchmark sucks
                 if not self.benchmark_select:
@@ -395,8 +339,7 @@ class Trendex:
                         break
                 else:
                     if self.too_small(df[self.benchmark]):
-                        print('Benchmark term %s is optimally selected, but performs '\
-                            'poorly between %s and %s' %(self.benchmark,date_start,date_end))
+                        small_dum = True
 
                 # Get rid of partial days
                 df = df.loc[df.isPartial.astype('str').eq('False'),ss]
@@ -405,18 +348,26 @@ class Trendex:
                 df[self.benchmark] = df[self.benchmark].replace({0:1})
 
                 if idx==0:
-                    trends = df
+                    frame = df.copy()
                 else:
-                    df = df.mul((trends[self.benchmark]/df[self.benchmark]).values,0)
-                    trends = trends.join(df.drop(self.benchmark,axis=1))
+                    adjframe = frame.join(df,how='inner',
+                                          lsuffix='_1',rsuffix='_2').copy()
+                    factor = (adjframe[self.benchmark+'_1'].values/
+                                  adjframe[self.benchmark+'_2'].values).mean()
+                    df = df*factor
+                    frame = frame.join(df.drop(self.benchmark,axis=1).copy()).copy()
 
         else:
             self.pytrend.build_payload(self.kw_list,geo=self.geo,
                                   timeframe='%s %s' %(date_start,date_end))
             df = self.pytrend.interest_over_time()
-            trends = df.loc[df.isPartial.astype('str').eq('False'),self.kw_list]
+            frame = df.loc[df.isPartial.astype('str').eq('False'),self.kw_list]
 
-        return trends
+        if small_dum:
+            print('Benchmark term %s is optimal, but performs '\
+                  'poorly between %s and %s' %(self.benchmark,date_start,date_end))
+
+        return frame
 
 
     def get_benchmark(self):
@@ -441,11 +392,26 @@ class Trendex:
         else:
             date_end = self.user_date_end
 
-        if not self.user_date_start:
-            date_start = (pd.to_datetime(date_end) -
-                          pd.Timedelta(days=self.cutoff)).strftime('%Y-%m-%d')
-        else:
-            date_start = self.user_date_start
+        # then deal with daily/weekly or monthly/quarterly
+        if self.frequency == 'daily' or self.frequency == 'weekly':
+            if not self.user_date_start:
+                date_start = (pd.to_datetime(date_end) -
+                              pd.Timedelta(days=self.cutoff_d)).strftime('%Y-%m-%d')
+            else:
+                date_start = self.user_date_start
+
+        elif self.frequency == 'monthly' or self.frequency == 'quarterly':
+            if not self.user_date_start:
+                date_start = (pd.to_datetime(date_end) -
+                              pd.Timedelta(days=self.cutoff_m)).strftime('%Y-%m-%d')
+            else:
+                datelength = (pd.to_datetime(date_end) -
+                              pd.to_datetime(self.user_date_start)).days
+                if datelength<2000:
+                    date_start = (pd.to_datetime(date_end) -
+                                  pd.Timedelta(days=2000)).strftime('%Y-%m-%d')
+                else:
+                    date_start = self.user_date_start
 
         return date_start, date_end
 
@@ -454,15 +420,15 @@ class Trendex:
         # if ending date was left blank, assume we want until today
         daterange = (pd.to_datetime(self.date_end) - pd.to_datetime(self.date_start)).days
 
-        if daterange>self.cutoff:
+        if daterange>self.cutoff_d:
             # see what length of time we are working with total
             # split it up into the overlapping chunks
             lst = [list(a) for a in zip(range(0,
                                               daterange+1,
-                                              self.cutoff-self.overlap),
-                                        range(self.cutoff,
-                                              daterange+self.cutoff,
-                                              self.cutoff-self.overlap))]
+                                              self.cutoff_d-self.overlap),
+                                        range(self.cutoff_d,
+                                              daterange+self.cutoff_d,
+                                              self.cutoff_d-self.overlap))]
             # make sure that the last value lines up with our actual last value
             lst[-1][1] = daterange
 
