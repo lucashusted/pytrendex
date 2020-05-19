@@ -12,7 +12,7 @@ with io.open(os.path.join(dir, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='pytrendex',
-    version='4.0.1',
+    version='5.0.0',
     description='Tool To Create Google Trends Index From Keywords',
     long_description=long_description,
     long_description_content_type='text/markdown',

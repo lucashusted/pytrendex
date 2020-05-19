@@ -19,9 +19,6 @@ This class makes an index utilizing Google Trends from keywords.
 - `geo`: str
       The country or place the search is conducted in, see Trends documentation.
 
-- `lang`: str, options are currently `en` for english and `es` for spanish
-      The language that the `kw_list` is (required for optimal benchmark selection).
-
 - `date_start`: str, optional
       The data where the index starts in format: 'yyyy-mm-dd',
       if none provided, then does it at the cutoff days before the date end.
@@ -99,7 +96,7 @@ date_start = '2018-01-01'
 frequency = 'weekly'
 
 ## Generating the indexes in two different ways
-result = Trendex(kw_list=kw_list, geo=geo, lang='en',
+result = Trendex(kw_list=kw_list, geo=geo,
                   plot=False, date_start=date_start, frequency=frequency)
 
 # A smaller index, here we create it in two steps (date start and end and frequency auto selected)

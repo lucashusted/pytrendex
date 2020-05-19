@@ -25,9 +25,6 @@ class Trendex:
     geo: str
         The country or place the search is conducted in, see Trends documentation.
 
-    lang: str, options are currently 'en' for english and 'es' for spanish
-        The language that the kw list is (required for optimal benchmark selection).
-
     date_start: str, optional
         The data where the index starts in format: 'yyyy-mm-dd',
         if none provided, then does it at the cutoff days before the date end.
@@ -107,14 +104,13 @@ class Trendex:
     overlap = 45 # An arbitrary (long) length of time for the series to overlap
     kw_limit = 20 # Default is to break kw_list into chunks with "+" operator
 
-    def __init__(self, kw_list, geo, lang, date_start=None, date_end=None,
+    def __init__(self, kw_list, geo, date_start=None, date_end=None,
                  frequency='daily', gen_index=True, plot=True, seasonal_adjust=True,
                  kw_list_split=True, benchmark_select=True, slowdown=True):
 
         # Input Arguments
         self.user_kw_list = kw_list.copy()
         self.geo = geo
-        self.lang = lang
         self.user_date_start = date_start
         self.user_date_end = date_end
         self.frequency = frequency
@@ -447,20 +443,15 @@ class Trendex:
         """
         Run generic searches over the timeframe to calculate best potential index:
 
-        The function takes the self object, analyzes the language of the kw_list and
-        runs searches over the entire timeframe, comparing the average of the series to
-        football (english) or futbol + fútbol (spanish).
+        The function takes the self object, and runs searches over the entire timeframe,
+        comparing the average of the series to football or variants of that word,
+        since this is a highly searched universal word.
 
         The highest average over the timeframe (making sure there are not years
         with 0 average is selected as benchmark).
         """
 
-        if self.lang == 'es':
-            popterm = 'fútbol'
-        elif self.lang == 'en':
-            popterm = 'football'
-        else:
-            raise ValueError('Currently only supports English (en) and Spanish (es)')
+        popterm = 'football + fútbol + futbol + futebol + Fußball + calcio'
 
         chunks = list(self.chunks([popterm]+self.kw_list))
 
